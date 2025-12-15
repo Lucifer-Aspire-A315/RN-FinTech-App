@@ -1,19 +1,36 @@
-// lib/src/core/auth_state.dart
 import 'package:fintech_frontend/models/user.dart';
 
 
 class AuthState {
-  final String? accessToken;
+  final bool isLoading;
+  final bool isAuthenticated;
   final User? user;
+  final String? error;
 
-  const AuthState({this.accessToken, this.user});
+  const AuthState({
+    required this.isLoading,
+    required this.isAuthenticated,
+    this.user,
+    this.error,
+  });
 
-  AuthState copyWith({String? accessToken, User? user}) {
+  factory AuthState.initial() => const AuthState(
+        isLoading: true,
+        isAuthenticated: false,
+        user: null,
+      );
+
+  AuthState copyWith({
+    bool? isLoading,
+    bool? isAuthenticated,
+    User? user,
+    String? error,
+  }) {
     return AuthState(
-      accessToken: accessToken ?? this.accessToken,
+      isLoading: isLoading ?? this.isLoading,
+      isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       user: user ?? this.user,
+      error: error,
     );
   }
-
-  bool get isAuthenticated => accessToken != null && user != null;
 }
