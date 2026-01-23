@@ -1,5 +1,4 @@
 // lib/src/app.dart
-import 'package:fintech_frontend/src/core/theme.dart';
 import 'package:fintech_frontend/src/routing/router_provider.dart';
 import 'package:fintech_frontend/src/theme/app_text_theme.dart';
 import 'package:flutter/material.dart';

@@ -47,6 +47,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   // ---------- RESTORE SESSION ----------
   Future<void> _restoreSession() async {
+    state = state.copyWith(isLoading: true);
+
     final repo = ref.read(authRepositoryProvider);
     final success = await repo.refreshTokenIfNeeded();
 
@@ -54,8 +56,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(
         isAuthenticated: true,
         user: repo.user,
+        isLoading: false,
       );
-      _authChange.notify();
+    } else {
+      state = state.copyWith(isLoading: false);
     }
   }
 
@@ -73,42 +77,41 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: repo.user,
       );
 
-      _authChange.notify();
+      _authChange.notify(); // 🔥 IMPORTANT
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
         error: e.toString(),
       );
     }
+  }
+
+  Future<void> logout() async {
+    await ref.read(authRepositoryProvider).logout();
+    state = const AuthState();
+    _authChange.notify(); // 🔥 IMPORTANT
   }
 
   // ---------- SIGNUP ----------
   Future<void> signup(Map<String, dynamic> payload) async {
-    state = state.copyWith(isLoading: true, error: null);
+  state = state.copyWith(isLoading: true, error: null);
 
-    try {
-      final repo = ref.read(authRepositoryProvider);
-      await repo.signup(payload);
+  try {
+    final repo = ref.read(authRepositoryProvider);
+    await repo.signup(payload);
 
-      state = state.copyWith(
-        isAuthenticated: true,
-        isLoading: false,
-        user: repo.user,
-      );
-
-      _authChange.notify();
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
-    }
+    // 🔥 DO NOT authenticate
+    // 🔥 DO NOT notify router
+    state = state.copyWith(
+      isLoading: false,
+    );
+  } catch (e) {
+    state = state.copyWith(
+      isLoading: false,
+      error: e.toString(),
+    );
+    rethrow;
   }
+}
 
-  // ---------- LOGOUT ----------
-  Future<void> logout() async {
-    await ref.read(authRepositoryProvider).logout();
-    state = const AuthState();
-    _authChange.notify();
-  }
 }

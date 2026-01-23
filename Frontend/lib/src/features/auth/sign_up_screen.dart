@@ -1,14 +1,12 @@
 // lib/src/features/auth/signup_screen.dart
 
-import 'package:fintech_frontend/models/user_role.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/auth_notifier.dart';
 import '../../core/design_tokens.dart';
 
-enum SignupRole { customer, merchant, banker, admin }
+enum SignupRole { customer, merchant, banker }
 
 extension SignupRoleExt on SignupRole {
   String get label {
@@ -19,8 +17,6 @@ extension SignupRoleExt on SignupRole {
         return 'Merchant';
       case SignupRole.banker:
         return 'Banker';
-      case SignupRole.admin:
-        return 'Admin';
     }
   }
 
@@ -50,13 +46,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   // Merchant
   final _bizName = TextEditingController();
-  final _bizReg = TextEditingController();
   final _bizGstin = TextEditingController();
   final _bizAddress = TextEditingController();
 
   // Banker
   final _employeeId = TextEditingController();
-  final _bankName = TextEditingController();
   final _bankBranch = TextEditingController();
 
   @override
@@ -66,11 +60,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     _password.dispose();
     _phone.dispose();
     _bizName.dispose();
-    _bizReg.dispose();
     _bizGstin.dispose();
     _bizAddress.dispose();
     _employeeId.dispose();
-    _bankName.dispose();
     _bankBranch.dispose();
     super.dispose();
   }
@@ -80,25 +72,30 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       'name': _name.text.trim(),
       'email': _email.text.trim(),
       'password': _password.text,
-      'phone': _phone.text.trim().isEmpty ? null : _phone.text.trim(),
       'role': _role.roleString,
-    }..removeWhere((k, v) => v == null || v == '');
+    };
+
+    if (_phone.text.trim().isNotEmpty) {
+      payload['phone'] = _phone.text.trim();
+    }
 
     if (_role == SignupRole.merchant) {
       payload.addAll({
         'businessName': _bizName.text.trim(),
-        'businessReg': _bizReg.text.trim(),
-        'gstin': _bizGstin.text.trim(),
-        'address': _bizAddress.text.trim(),
-      }..removeWhere((k, v) => v == null || v == ''));
+        if (_bizGstin.text.trim().isNotEmpty)
+          'gstNumber': _bizGstin.text.trim(),
+        if (_bizAddress.text.trim().isNotEmpty)
+          'address': _bizAddress.text.trim(),
+      });
     }
 
     if (_role == SignupRole.banker) {
       payload.addAll({
-        'employeeId': _employeeId.text.trim(),
-        'bankName': _bankName.text.trim(),
+        // TEMP – must be replaced with real bank selection later
+        'bankId': 'TEMP_BANK_ID',
         'branch': _bankBranch.text.trim(),
-      }..removeWhere((k, v) => v == null || v == ''));
+        'employeeId': _employeeId.text.trim(),
+      });
     }
 
     return payload;
@@ -113,65 +110,32 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     });
 
     try {
-      final notifier = ref.read(authNotifierProvider.notifier);
-      await notifier.signup(_buildPayload());
+      await ref.read(authNotifierProvider.notifier).signup(_buildPayload());
 
-      final user = ref.read(authNotifierProvider).user;
       if (!mounted) return;
 
-      if (user != null) {
-        switch (user.role) {
-          case UserRole.customer:
-            context.go('/customer/dashboard');
-            break;
-          case UserRole.merchant:
-            context.go('/merchant/dashboard');
-            break;
-          case UserRole.banker:
-            context.go('/banker/dashboard');
-            break;
-          case UserRole.admin:
-            context.go('/admin/dashboard');
-            break;
-          case UserRole.unknown:
-            context.go('/');
-            break;
-        }
-      } else {
-        context.go('/login');
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Account created. Please verify your email before logging in.',
+          ),
+        ),
+      );
+
+      // 🔁 Go back to login
+      Navigator.of(context).pop();
     } catch (e) {
       setState(() {
-        _error = 'Signup failed. Please try again.';
+        _error = 'Signup failed. Please check details and try again.';
       });
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      if (mounted) setState(() => _loading = false);
     }
-  }
-
-  Widget _roleChips() {
-    return Wrap(
-      spacing: DT.gapSm,
-      children: SignupRole.values.map((r) {
-        return ChoiceChip(
-          label: Text(r.label),
-          selected: _role == r,
-          onSelected: (_) {
-            setState(() {
-              _role = r;
-              _step = 0;
-            });
-          },
-        );
-      }).toList(),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isMulti = _role == SignupRole.merchant || _role == SignupRole.banker;
+    final isMulti = _role != SignupRole.customer;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Create account')),
@@ -201,8 +165,27 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                                       .textTheme
                                       .headlineSmall),
                               const SizedBox(height: DT.gap),
-                              _roleChips(),
+
+                              /// ROLE SELECTOR
+                              Wrap(
+                                spacing: DT.gapSm,
+                                children: SignupRole.values.map((r) {
+                                  return ChoiceChip(
+                                    label: Text(r.label),
+                                    selected: _role == r,
+                                    onSelected: (_) {
+                                      setState(() {
+                                        _role = r;
+                                        _step = 0;
+                                      });
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+
                               const SizedBox(height: DT.gap),
+
+                              /// STEP 1 – BASIC
                               if (!isMulti || _step == 0) ...[
                                 _field(_name, 'Full name'),
                                 _emailField(),
@@ -210,20 +193,26 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                                 _field(_phone, 'Phone (optional)',
                                     required: false),
                               ],
-                              if (isMulti &&
-                                  _step == 1 &&
-                                  _role == SignupRole.merchant)
-                                _field(_bizName, 'Business name'),
-                              if (isMulti &&
-                                  _step == 1 &&
-                                  _role == SignupRole.banker)
-                                _field(_employeeId, 'Employee ID'),
+
+                              /// STEP 2 – ROLE SPECIFIC
+                              if (isMulti && _step == 1) ...[
+                                if (_role == SignupRole.merchant)
+                                  _field(_bizName, 'Business name'),
+                                if (_role == SignupRole.banker) ...[
+                                  _field(_employeeId, 'Employee ID'),
+                                  _field(_bankBranch, 'Branch'),
+                                ],
+                              ],
+
                               if (_error != null) ...[
                                 const SizedBox(height: DT.gapSm),
                                 Text(_error!,
                                     style: const TextStyle(color: Colors.red)),
                               ],
+
                               const SizedBox(height: DT.gap),
+
+                              /// ACTIONS
                               Row(
                                 children: [
                                   if (isMulti && _step > 0)
@@ -266,7 +255,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   ),
                 ),
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -287,5 +276,15 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   }
 
   Widget _emailField() => _field(_email, 'Email');
-  Widget _passwordField() => _field(_password, 'Password');
+
+  Widget _passwordField() => Padding(
+        padding: const EdgeInsets.only(bottom: DT.gapSm),
+        child: TextFormField(
+          controller: _password,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'Password'),
+          validator: (v) =>
+              (v == null || v.length < 8) ? 'Min 8 characters' : null,
+        ),
+      );
 }

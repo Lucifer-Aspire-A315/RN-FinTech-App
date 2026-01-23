@@ -145,48 +145,33 @@ class _LoginCardState extends ConsumerState<_LoginCard> {
       _error = null;
     });
 
-    final authNotifier = ref.read(authNotifierProvider.notifier);
-
     try {
-      await authNotifier.login(
-        _email.text.trim(),
-        _password.text,
-      );
+      await ref.read(authNotifierProvider.notifier).login(
+            _email.text.trim(),
+            _password.text,
+          );
 
-      final typedUser = ref.read(authNotifierProvider).user;
-      debugPrint('[LoginScreen] logged in user: $typedUser');
-
-      if (!mounted) return;
-
-      if (typedUser != null) {
-        switch (typedUser.role) {
-          case UserRole.customer:
-            context.go('/customer/dashboard');
-            return;
-          case UserRole.merchant:
-            context.go('/merchant/dashboard');
-            return;
-          case UserRole.banker:
-            context.go('/banker/dashboard');
-            return;
-          case UserRole.admin:
-            context.go('/admin/dashboard');
-            return;
-          default:
-            context.go('/login');
-            return;
-        }
-      } else {
-        context.go('/login');
-        return;
-      }
+      // ✅ DO NOT NAVIGATE MANUALLY
+      // AuthGate / router_provider will react to auth state change
     } catch (e) {
       if (!mounted) return;
+
+      final message = e.toString();
+
+      // 🔐 EMAIL NOT VERIFIED
+      if (message.contains('Email not verified')) {
+        context.go(
+          '/email-not-verified',
+          extra: _email.text.trim(),
+        );
+        return;
+      }
+
+      // 🔐 OTHER AUTH ERRORS
       setState(() {
-        _error = e.toString();
+        _error = message.replaceAll('Exception: ', '');
       });
     } finally {
-      // 🔥 THIS IS THE IMPORTANT PART
       if (!mounted) return;
       setState(() {
         _loading = false;

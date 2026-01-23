@@ -81,4 +81,11 @@ class AuthRepository {
     user = null;
     await _storage.delete(key: 'refresh_token');
   }
+
+  Future<void> resendVerification(String email) async {
+  await _dio.post('/auth/resend-verification', data: {
+    'email': email,
+  });
+}
+
 }
