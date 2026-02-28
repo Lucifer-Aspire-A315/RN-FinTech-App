@@ -110,6 +110,7 @@ class KycRepository {
     required String publicId,
     required int fileSize,
     required String contentType,
+    String? secureUrl,
     String? targetUserId,
   }) async {
     final onBehalf = targetUserId != null && targetUserId.isNotEmpty;
@@ -120,6 +121,7 @@ class KycRepository {
         'publicId': publicId,
         'fileSize': fileSize,
         'contentType': contentType,
+        if (secureUrl != null && secureUrl.isNotEmpty) 'secureUrl': secureUrl,
       },
     );
   }
@@ -153,6 +155,26 @@ class KycRepository {
       'status': approved ? 'VERIFIED' : 'REJECTED',
       'notes': notes ?? '',
     });
+  }
+
+  Future<List<KycOnBehalfTarget>> searchOnBehalfUsers({
+    required String search,
+    int limit = 20,
+  }) async {
+    final res = await _apiDio.get('/kyc/on-behalf/users', queryParameters: {
+      'search': search,
+      'limit': limit,
+    });
+    final root = (res.data as Map).cast<String, dynamic>();
+    final data = (root['data'] is Map)
+        ? (root['data'] as Map).cast<String, dynamic>()
+        : <String, dynamic>{};
+    final users = (data['users'] as List? ?? const <dynamic>[])
+        .whereType<Map>()
+        .map((e) => KycOnBehalfTarget.fromMap(e.cast<String, dynamic>()))
+        .where((e) => e.id.isNotEmpty)
+        .toList();
+    return users;
   }
 }
 

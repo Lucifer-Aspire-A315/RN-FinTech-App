@@ -65,6 +65,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _authChange.notify(); // 🔥 IMPORTANT
   }
 
+  Future<void> refreshUser() async {
+    try {
+      final repo = ref.read(authRepositoryProvider);
+      final current = await repo.fetchCurrentUser();
+      state = state.copyWith(user: current);
+      _authChange.notify();
+    } catch (_) {}
+  }
+
   // ---------- SIGNUP ----------
   Future<void> signup(Map<String, dynamic> payload) async {
     state = state.copyWith(isLoading: true, error: null);

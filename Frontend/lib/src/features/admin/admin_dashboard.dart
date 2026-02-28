@@ -21,10 +21,10 @@ class AdminDashboard extends ConsumerWidget {
     final users = _asMap(data['users']);
     final loans = _asMap(data['loans']);
 
-    final totalUsers = users.values.fold<int>(0, (p, v) => p + _toInt(v));
+    final totalUsers = _sumUserCounts(users);
     final totalLoans = _toInt(loans['totalCount']);
     final totalVolume = loans['totalVolume']?.toString() ?? '0';
-    final pendingLoans = _toInt(_asMap(loans['byStatus'])['SUBMITTED']);
+    final pendingLoans = _extractStatusCount(_asMap(loans['byStatus'])['SUBMITTED']);
     final recentAudits = (_asList(data['recentActivity'])).length;
 
     return Scaffold(
@@ -32,6 +32,10 @@ class AdminDashboard extends ConsumerWidget {
       appBar: AppBar(
         title: Text('Admin Dashboard', style: Theme.of(context).textTheme.titleLarge),
         actions: [
+          IconButton(
+            onPressed: () => context.push('/notifications'),
+            icon: const Icon(Icons.notifications_rounded),
+          ),
           IconButton(
             onPressed: () => context.push('/security'),
             icon: const Icon(Icons.security_outlined),
@@ -81,7 +85,7 @@ class AdminDashboard extends ConsumerWidget {
                   child: _QuickActions(
                     title: 'Admin Actions',
                     actions: const [
-                      _QuickActionData('Manage Users', Icons.groups_rounded),
+                      _QuickActionData('Manage Users', Icons.groups_rounded, route: '/admin/users'),
                       _QuickActionData(
                         'Loan Types',
                         Icons.tune_rounded,
@@ -188,10 +192,38 @@ class AdminDashboard extends ConsumerWidget {
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
+  int _sumUserCounts(Map<String, dynamic> users) {
+    if (users.isEmpty) return 0;
+    var total = 0;
+    for (final value in users.values) {
+      if (value is Map) {
+        total += _toInt(value['count']);
+      } else {
+        total += _toInt(value);
+      }
+    }
+    return total;
+  }
+
+  int _extractStatusCount(dynamic value) {
+    if (value is Map) {
+      return _toInt(value['count']);
+    }
+    return _toInt(value);
+  }
+
   void _handleNavTap(BuildContext context, int index) {
     if (index == 0) return;
+    if (index == 1) {
+      context.push('/admin/users');
+      return;
+    }
     if (index == 2) {
       context.push('/loans');
+      return;
+    }
+    if (index == 3) {
+      context.push('/profile');
       return;
     }
     final labels = ['Home', 'Users', 'Loans', 'Profile'];

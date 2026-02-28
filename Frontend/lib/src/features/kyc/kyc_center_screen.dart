@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:fintech_frontend/models/user_role.dart';
 import 'package:fintech_frontend/src/core/auth_notifier.dart';
@@ -16,14 +18,29 @@ class KycCenterScreen extends ConsumerStatefulWidget {
 }
 
 class _KycCenterScreenState extends ConsumerState<KycCenterScreen> {
+  static const int _maxFileBytes = 5 * 1024 * 1024;
   bool _loading = false;
   String? _error;
   KycStatusResponse? _status;
+  bool _onBehalfMode = false;
+  final TextEditingController _targetSearch = TextEditingController();
+  Timer? _searchDebounce;
+  bool _targetSearchLoading = false;
+  String? _targetSearchError;
+  List<KycOnBehalfTarget> _targetResults = const <KycOnBehalfTarget>[];
+  KycOnBehalfTarget? _selectedTarget;
 
   @override
   void initState() {
     super.initState();
     _refresh();
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _targetSearch.dispose();
+    super.dispose();
   }
 
   Future<void> _refresh() async {
@@ -59,6 +76,62 @@ class _KycCenterScreenState extends ConsumerState<KycCenterScreen> {
     return null;
   }
 
+  void _toggleOnBehalf(bool enabled) {
+    setState(() {
+      _onBehalfMode = enabled;
+      if (!enabled) {
+        _selectedTarget = null;
+        _targetResults = const <KycOnBehalfTarget>[];
+        _targetSearchError = null;
+        _targetSearch.clear();
+      }
+    });
+  }
+
+  void _onTargetSearchChanged(String value) {
+    if (_selectedTarget != null && value.trim() != _selectedTarget!.name) {
+      setState(() => _selectedTarget = null);
+    }
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      _searchTargets(value.trim());
+    });
+  }
+
+  Future<void> _searchTargets(String query) async {
+    if (!_onBehalfMode) return;
+    if (query.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _targetResults = const <KycOnBehalfTarget>[];
+        _targetSearchError = null;
+      });
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _targetSearchLoading = true;
+      _targetSearchError = null;
+    });
+    try {
+      final users = await ref.read(kycRepositoryProvider).searchOnBehalfUsers(
+            search: query,
+            limit: 15,
+          );
+      if (!mounted) return;
+      setState(() => _targetResults = users);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _targetSearchError = e.toString().replaceFirst('Exception: ', '');
+        _targetResults = const <KycOnBehalfTarget>[];
+      });
+    } finally {
+      if (mounted) setState(() => _targetSearchLoading = false);
+    }
+  }
+
   Future<void> _uploadDocument(KycRequiredDocument doc) async {
     setState(() {
       _loading = true;
@@ -82,9 +155,20 @@ class _KycCenterScreenState extends ConsumerState<KycCenterScreen> {
       if (bytes == null || bytes.isEmpty) {
         throw Exception('Unable to read selected file. Try another file.');
       }
+      if (bytes.length > _maxFileBytes) {
+        throw Exception('File exceeds 5MB limit. Select a smaller file.');
+      }
 
       final repo = ref.read(kycRepositoryProvider);
-      final uploadReq = await repo.createUploadRequest(docType: doc.type);
+      final targetUserId = _onBehalfMode ? _selectedTarget?.id : null;
+      if (_onBehalfMode && (targetUserId == null || targetUserId.isEmpty)) {
+        throw Exception('Select a target user for on-behalf upload');
+      }
+
+      final uploadReq = await repo.createUploadRequest(
+        docType: doc.type,
+        targetUserId: targetUserId,
+      );
       final uploaded = await repo.uploadToCloudinary(
         request: uploadReq,
         bytes: bytes,
@@ -92,6 +176,7 @@ class _KycCenterScreenState extends ConsumerState<KycCenterScreen> {
       );
 
       final publicId = uploaded['public_id']?.toString() ?? uploadReq.publicId;
+      final secureUrl = uploaded['secure_url']?.toString() ?? '';
       final contentType = _contentTypeFromFilename(file.name);
       final fileSize = (uploaded['bytes'] is num)
           ? (uploaded['bytes'] as num).toInt()
@@ -102,6 +187,8 @@ class _KycCenterScreenState extends ConsumerState<KycCenterScreen> {
         publicId: publicId,
         fileSize: fileSize,
         contentType: contentType,
+        secureUrl: secureUrl,
+        targetUserId: targetUserId,
       );
 
       if (!mounted) return;
@@ -127,6 +214,8 @@ class _KycCenterScreenState extends ConsumerState<KycCenterScreen> {
   Widget build(BuildContext context) {
     final role = ref.watch(authNotifierProvider).user?.role ?? UserRole.unknown;
     final isBanker = role == UserRole.banker;
+    final canOnBehalf =
+        role == UserRole.merchant || role == UserRole.banker || role == UserRole.admin;
     final required = _status?.requiredDocuments ?? const <KycRequiredDocument>[];
 
     return Scaffold(
@@ -164,6 +253,122 @@ class _KycCenterScreenState extends ConsumerState<KycCenterScreen> {
                   leading: const Icon(Icons.verified_user_rounded),
                 ),
               ),
+            if (canOnBehalf) ...[
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Upload On Behalf'),
+                        subtitle: const Text('Use for customer/user KYC upload by role permission'),
+                        value: _onBehalfMode,
+                        onChanged: _toggleOnBehalf,
+                      ),
+                      if (_onBehalfMode) ...[
+                        TextField(
+                          controller: _targetSearch,
+                          onChanged: _onTargetSearchChanged,
+                          decoration: InputDecoration(
+                            labelText: 'Search User (name/email/phone)',
+                            helperText: role == UserRole.merchant
+                                ? 'Only your customers are shown'
+                                : 'Customers and merchants are shown',
+                            prefixIcon: const Icon(Icons.search_rounded),
+                            suffixIcon: _targetSearchLoading
+                                ? const Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                  )
+                                : (_targetSearch.text.isNotEmpty
+                                    ? IconButton(
+                                        onPressed: () {
+                                          _targetSearch.clear();
+                                          _searchTargets('');
+                                        },
+                                        icon: const Icon(Icons.clear_rounded),
+                                      )
+                                    : null),
+                          ),
+                        ),
+                        if (_targetSearchError != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              _targetSearchError!,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        if (_selectedTarget != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                              tileColor: const Color(0xFFEFF6FF),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              leading: const Icon(Icons.person_rounded),
+                              title: Text(_selectedTarget!.name),
+                              subtitle: Text(
+                                '${_selectedTarget!.email} | ${_selectedTarget!.role}',
+                              ),
+                              trailing: IconButton(
+                                onPressed: () => setState(() => _selectedTarget = null),
+                                icon: const Icon(Icons.close_rounded),
+                              ),
+                            ),
+                          ),
+                        if (_targetResults.isNotEmpty)
+                          Container(
+                            margin: const EdgeInsets.only(top: 8),
+                            constraints: const BoxConstraints(maxHeight: 220),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFFD1D5DB)),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: ListView.separated(
+                              shrinkWrap: true,
+                              itemCount: _targetResults.length,
+                              separatorBuilder: (_, __) => const Divider(height: 1),
+                              itemBuilder: (context, index) {
+                                final item = _targetResults[index];
+                                return ListTile(
+                                  dense: true,
+                                  title: Text(item.name.isNotEmpty ? item.name : item.email),
+                                  subtitle: Text('${item.email} | ${item.role}'),
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedTarget = item;
+                                      _targetResults = const <KycOnBehalfTarget>[];
+                                      _targetSearch.text = item.name;
+                                    });
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        if (_targetSearch.text.trim().isNotEmpty &&
+                            !_targetSearchLoading &&
+                            _targetResults.isEmpty &&
+                            _selectedTarget == null)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 8),
+                            child: Text('No matching users found. Try different search text.'),
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             const SizedBox(height: 10),
             if (required.isEmpty)
               const Card(

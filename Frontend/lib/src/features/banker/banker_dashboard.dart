@@ -58,6 +58,10 @@ class BankerDashboard extends ConsumerWidget {
         title: Text('Banker Dashboard', style: Theme.of(context).textTheme.titleLarge),
         actions: [
           IconButton(
+            onPressed: () => context.push('/notifications'),
+            icon: const Icon(Icons.notifications_rounded),
+          ),
+          IconButton(
             onPressed: () => context.push('/security'),
             icon: const Icon(Icons.security_outlined),
           ),
@@ -221,6 +225,10 @@ class BankerDashboard extends ConsumerWidget {
     if (index == 0) return;
     if (index == 2) {
       context.push('/loans');
+      return;
+    }
+    if (index == 3) {
+      context.push('/profile');
       return;
     }
     final labels = ['Home', 'Queue', 'Loans', 'Profile'];

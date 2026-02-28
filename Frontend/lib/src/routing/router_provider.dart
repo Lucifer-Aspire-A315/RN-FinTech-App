@@ -7,6 +7,7 @@ import 'package:fintech_frontend/src/features/auth/reset_password_screen.dart';
 import 'package:fintech_frontend/src/features/auth/sign_up_screen.dart';
 import 'package:fintech_frontend/src/features/auth/verify_email_screen.dart';
 import 'package:fintech_frontend/src/features/admin/admin_dashboard.dart';
+import 'package:fintech_frontend/src/features/admin/admin_user_management_screen.dart';
 import 'package:fintech_frontend/src/features/admin/bank_management_screen.dart';
 import 'package:fintech_frontend/src/features/admin/loan_type_management_screen.dart';
 import 'package:fintech_frontend/src/features/banker/banker_dashboard.dart';
@@ -15,6 +16,8 @@ import 'package:fintech_frontend/src/features/merchant/merchant_dashboard.dart';
 import 'package:fintech_frontend/src/features/loans/loan_apply_screen.dart';
 import 'package:fintech_frontend/src/features/loans/loan_detail_screen.dart';
 import 'package:fintech_frontend/src/features/loans/loan_list_screen.dart';
+import 'package:fintech_frontend/src/features/notifications/notification_center_screen.dart';
+import 'package:fintech_frontend/src/features/profile/profile_screen.dart';
 import 'package:fintech_frontend/src/features/kyc/kyc_center_screen.dart';
 import 'package:fintech_frontend/src/features/kyc/kyc_review_screen.dart';
 import 'package:fintech_frontend/src/features/settings/security_screen.dart';
@@ -129,6 +132,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const AdminDashboard(),
       ),
       GoRoute(
+        path: '/admin/users',
+        builder: (_, __) => const AdminUserManagementScreen(),
+      ),
+      GoRoute(
         path: '/admin/loan-types',
         builder: (_, __) => const LoanTypeManagementScreen(),
       ),
@@ -161,6 +168,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/kyc/review',
         builder: (_, __) => const KycReviewScreen(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (_, __) => const NotificationCenterScreen(),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (_, __) => const ProfileScreen(),
       ),
     ],
   );

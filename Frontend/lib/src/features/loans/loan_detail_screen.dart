@@ -1,7 +1,9 @@
 import 'package:fintech_frontend/models/user_role.dart';
 import 'package:fintech_frontend/src/core/auth_notifier.dart';
 import 'package:fintech_frontend/src/core/loan_repository.dart';
+import 'package:fintech_frontend/src/core/upload_repository.dart';
 import 'package:fintech_frontend/src/features/loans/loan_models.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -15,6 +17,7 @@ class LoanDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
+  static const int _maxUploadBytes = 10 * 1024 * 1024;
   bool _loading = false;
   bool _actionLoading = false;
   String? _error;
@@ -404,6 +407,89 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
     if (!ok) _showError('Failed to open document');
   }
 
+  String _contentTypeFromFilename(String filename) {
+    final lower = filename.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.pdf')) return 'application/pdf';
+    return 'image/jpeg';
+  }
+
+  Future<void> _uploadAndRegisterLoanDocument() async {
+    final typeController = TextEditingController(text: 'attachment');
+
+    final type = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Document Type'),
+        content: TextField(
+          controller: typeController,
+          decoration: const InputDecoration(
+            labelText: 'Type',
+            helperText: 'Examples: ID_PROOF, PAN_CARD, invoice, attachment',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, typeController.text.trim()),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (type == null || type.isEmpty) return;
+
+    setState(() => _actionLoading = true);
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+        withData: true,
+        type: FileType.custom,
+        allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
+      );
+      final file = (picked != null && picked.files.isNotEmpty) ? picked.files.first : null;
+      if (file == null) return;
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        throw Exception('Unable to read file');
+      }
+      if (bytes.length > _maxUploadBytes) {
+        throw Exception('File exceeds 10MB limit. Please upload a smaller file.');
+      }
+
+      final uploadRepo = ref.read(uploadRepositoryProvider);
+      final sign = await uploadRepo.getSignature(
+        folder: 'loan-documents',
+        filename: file.name,
+      );
+      final uploaded = await uploadRepo.uploadToCloudinary(
+        signature: sign,
+        bytes: bytes,
+        filename: file.name,
+      );
+
+      await uploadRepo.registerLoanDocument(
+        loanId: widget.loanId,
+        publicId: uploaded.publicId,
+        secureUrl: uploaded.secureUrl,
+        filename: file.name,
+        fileType: _contentTypeFromFilename(file.name),
+        bytes: uploaded.bytes > 0 ? uploaded.bytes : bytes.length,
+        type: type,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Document uploaded and attached to loan')),
+      );
+      await _fetch();
+    } catch (e) {
+      _showError(e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _actionLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final role = ref.watch(authNotifierProvider).user?.role ?? UserRole.unknown;
@@ -443,6 +529,11 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
     final canDisburse = loan != null &&
         role == UserRole.banker &&
         loan.status == 'APPROVED';
+    final canUploadDocs = loan != null &&
+        (role == UserRole.customer ||
+            role == UserRole.merchant ||
+            role == UserRole.banker ||
+            role == UserRole.admin);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Loan Detail')),
@@ -514,7 +605,9 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  '${d.type}${(d.filename ?? '').isNotEmpty ? ' - ${d.filename}' : ''}',
+                                  '${d.type}${(d.filename ?? '').isNotEmpty ? ' - ${d.filename}' : ''}'
+                                  '${(d.fileType ?? '').isNotEmpty ? ' (${d.fileType})' : ''}'
+                                  '${d.createdAt != null ? ' | ${d.createdAt!.toLocal().toString().split('.').first}' : ''}',
                                 ),
                               ),
                               if ((d.url ?? '').isNotEmpty)
@@ -611,6 +704,14 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
                 onPressed: _actionLoading ? null : _disburseLoan,
                 icon: const Icon(Icons.payments_rounded),
                 label: const Text('Disburse Loan'),
+              ),
+            ],
+            if (canUploadDocs) ...[
+              const SizedBox(height: 10),
+              FilledButton.tonalIcon(
+                onPressed: _actionLoading ? null : _uploadAndRegisterLoanDocument,
+                icon: const Icon(Icons.upload_file_rounded),
+                label: const Text('Upload Loan Document'),
               ),
             ],
           ],

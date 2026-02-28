@@ -149,3 +149,32 @@ class KycPendingItem {
     );
   }
 }
+
+class KycOnBehalfTarget {
+  final String id;
+  final String name;
+  final String email;
+  final String phone;
+  final String role;
+  final String status;
+
+  const KycOnBehalfTarget({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.phone,
+    required this.role,
+    required this.status,
+  });
+
+  factory KycOnBehalfTarget.fromMap(Map<String, dynamic> map) {
+    return KycOnBehalfTarget(
+      id: map['id']?.toString() ?? '',
+      name: map['name']?.toString() ?? '',
+      email: map['email']?.toString() ?? '',
+      phone: map['phone']?.toString() ?? '',
+      role: map['role']?.toString() ?? '',
+      status: map['status']?.toString() ?? '',
+    );
+  }
+}
