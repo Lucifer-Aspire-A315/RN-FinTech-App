@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import 'design_tokens.dart';
 
 class AppTheme {
@@ -8,7 +9,7 @@ class AppTheme {
       seedColor: DT.accent,
       primary: DT.primary,
       secondary: DT.accent,
-      background: DT.background,
+      surface: DT.background,
       brightness: Brightness.light,
     );
 
@@ -17,7 +18,6 @@ class AppTheme {
       colorScheme: colorScheme,
       scaffoldBackgroundColor: DT.background,
       visualDensity: VisualDensity.adaptivePlatformDensity,
-      // Typography - use Google Fonts (Poppins)
       textTheme: GoogleFonts.poppinsTextTheme().apply(
         bodyColor: DT.primary,
         displayColor: DT.primary,
@@ -25,66 +25,59 @@ class AppTheme {
     );
 
     return base.copyWith(
-      // AppBar
       appBarTheme: AppBarTheme(
-        elevation: 0.0,
-        backgroundColor: DT.primaryVariant,
-        foregroundColor: Colors.white,
+        elevation: 0,
+        backgroundColor: DT.background,
+        foregroundColor: DT.primaryVariant,
         centerTitle: false,
-        titleTextStyle:
-            GoogleFonts.poppins(fontSize: 18.0, fontWeight: FontWeight.w600),
-        iconTheme: const IconThemeData(color: Colors.white),
+        titleTextStyle: GoogleFonts.poppins(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: DT.primaryVariant,
+        ),
+        iconTheme: const IconThemeData(color: DT.primaryVariant),
       ),
-
-      // Cards
       cardTheme: CardThemeData(
         color: DT.surface,
         elevation: DT.elevation,
         margin: const EdgeInsets.symmetric(horizontal: DT.gap),
         shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(DT.radius)),
+          borderRadius: BorderRadius.circular(DT.radius),
+        ),
       ),
-
-      // Elevated / Filled buttons
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: DT.accent,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           elevation: 3,
           textStyle: const TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
-
-      // Outlined
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: DT.primary,
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          side: BorderSide(color: DT.primary.withOpacity(0.08)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          side: BorderSide(color: DT.primary.withValues(alpha: 0.08)),
         ),
       ),
-
-      // Text buttons
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: DT.accent,
           textStyle: const TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
-
-      // Floating action
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: DT.accent,
         foregroundColor: Colors.white,
         elevation: 4,
       ),
-
-      // Bottom nav
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: DT.surface,
         selectedItemColor: DT.primaryVariant,
@@ -93,44 +86,42 @@ class AppTheme {
         elevation: 12,
         showSelectedLabels: true,
       ),
-
-      // Input fields
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: DT.surfaceElevated,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
         hintStyle: TextStyle(color: DT.muted),
       ),
-
-      // Chips
       chipTheme: ChipThemeData(
         backgroundColor: DT.surfaceElevated,
-        selectedColor: DT.accent.withOpacity(0.12),
+        selectedColor: DT.accent.withValues(alpha: 0.12),
         labelStyle: GoogleFonts.poppins(
-            fontSize: 13, fontWeight: FontWeight.w500, color: DT.primary),
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: DT.primary,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
       ),
-
-      // Icon theme
       iconTheme: const IconThemeData(size: 20, color: Color(0xFF0B1220)),
-
-      // Elevated surface & shadows handled by Material 3 defaults + elevations defined in tokens
     );
   }
 
   static ThemeData dark() {
-    // minimal dark theme skeleton — customize further if you want
     final colorScheme =
         ColorScheme.fromSeed(seedColor: DT.accent, brightness: Brightness.dark);
     final base = ThemeData(
-        useMaterial3: true,
-        colorScheme: colorScheme,
-        brightness: Brightness.dark);
+      useMaterial3: true,
+      colorScheme: colorScheme,
+      brightness: Brightness.dark,
+    );
+
     return base.copyWith(
       textTheme: GoogleFonts.poppinsTextTheme().apply(bodyColor: Colors.white),
       scaffoldBackgroundColor: const Color(0xFF071026),
@@ -138,7 +129,8 @@ class AppTheme {
         color: const Color(0xFF071026),
         elevation: DT.elevationLow,
         shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(DT.radius)),
+          borderRadius: BorderRadius.circular(DT.radius),
+        ),
       ),
     );
   }

@@ -58,7 +58,7 @@ class _EmailNotVerifiedScreenState
               ),
               const SizedBox(height: DT.gapSm),
               Text(
-                'We’ve sent a verification link to:\n${widget.email}',
+                "We've sent a verification link to:\n${widget.email}",
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: DT.gap),
@@ -86,3 +86,4 @@ class _EmailNotVerifiedScreenState
     );
   }
 }
+

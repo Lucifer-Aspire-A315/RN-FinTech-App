@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:dio/dio.dart';
 
 import '../../core/api_client.dart';
 import '../../core/design_tokens.dart';
@@ -62,7 +61,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                     children: [
                       CircularProgressIndicator(),
                       SizedBox(height: 16),
-                      Text('Verifying your email…'),
+                      Text('Verifying your email...'),
                     ],
                   )
                 : _error != null
@@ -86,3 +85,4 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     );
   }
 }
+

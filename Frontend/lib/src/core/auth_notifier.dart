@@ -1,41 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fintech_frontend/models/user.dart';
 import 'auth_repository.dart';
 import 'auth_change_notifier.dart';
+import 'auth_state.dart';
 
 final authNotifierProvider =
     StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final authChange = ref.read(authChangeNotifierProvider);
   return AuthNotifier(ref, authChange);
 });
-
-class AuthState {
-  final bool isAuthenticated;
-  final bool isLoading;
-  final User? user;
-  final String? error;
-
-  const AuthState({
-    this.isAuthenticated = false,
-    this.isLoading = false,
-    this.user,
-    this.error,
-  });
-
-  AuthState copyWith({
-    bool? isAuthenticated,
-    bool? isLoading,
-    User? user,
-    String? error,
-  }) {
-    return AuthState(
-      isAuthenticated: isAuthenticated ?? this.isAuthenticated,
-      isLoading: isLoading ?? this.isLoading,
-      user: user ?? this.user,
-      error: error,
-    );
-  }
-}
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final Ref ref;
@@ -83,6 +55,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoading: false,
         error: e.toString(),
       );
+      rethrow;
     }
   }
 
@@ -94,24 +67,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   // ---------- SIGNUP ----------
   Future<void> signup(Map<String, dynamic> payload) async {
-  state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(isLoading: true, error: null);
 
-  try {
-    final repo = ref.read(authRepositoryProvider);
-    await repo.signup(payload);
+    try {
+      final repo = ref.read(authRepositoryProvider);
+      await repo.signup(payload);
 
-    // 🔥 DO NOT authenticate
-    // 🔥 DO NOT notify router
-    state = state.copyWith(
-      isLoading: false,
-    );
-  } catch (e) {
-    state = state.copyWith(
-      isLoading: false,
-      error: e.toString(),
-    );
-    rethrow;
+      state = state.copyWith(
+        isLoading: false,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+      rethrow;
+    }
   }
-}
-
 }

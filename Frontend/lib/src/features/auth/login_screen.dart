@@ -1,6 +1,5 @@
 // lib/src/features/auth/login_screen.dart
 
-import 'package:fintech_frontend/models/user_role.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -60,7 +59,7 @@ class LoginScreen extends ConsumerWidget {
   }
 }
 
-/* ───────────────────────── LEFT PANEL ───────────────────────── */
+/* LEFT PANEL */
 
 class _LeftMarketingPanel extends StatelessWidget {
   const _LeftMarketingPanel();
@@ -80,7 +79,7 @@ class _LeftMarketingPanel extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          'Secure lending, fast approvals — built for customers, merchants and banks.',
+          'Secure lending, fast approvals - built for customers, merchants and banks.',
           style: Theme.of(context)
               .textTheme
               .bodyLarge
@@ -98,10 +97,10 @@ class _LeftMarketingPanel extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('⚡ Instant approvals',
+                Text('Instant approvals',
                     style: TextStyle(color: Colors.white)),
                 SizedBox(height: 6),
-                Text('💳 Flexible repayment plans',
+                Text('Flexible repayment plans',
                     style: TextStyle(color: Colors.white70)),
               ],
             ),
@@ -112,7 +111,7 @@ class _LeftMarketingPanel extends StatelessWidget {
   }
 }
 
-/* ───────────────────────── LOGIN CARD ───────────────────────── */
+/* LOGIN CARD */
 
 class _LoginCard extends ConsumerStatefulWidget {
   const _LoginCard();
@@ -151,14 +150,14 @@ class _LoginCardState extends ConsumerState<_LoginCard> {
             _password.text,
           );
 
-      // ✅ DO NOT NAVIGATE MANUALLY
+      //  DO NOT NAVIGATE MANUALLY
       // AuthGate / router_provider will react to auth state change
     } catch (e) {
       if (!mounted) return;
 
       final message = e.toString();
 
-      // 🔐 EMAIL NOT VERIFIED
+      //  EMAIL NOT VERIFIED
       if (message.contains('Email not verified')) {
         context.go(
           '/email-not-verified',
@@ -167,16 +166,25 @@ class _LoginCardState extends ConsumerState<_LoginCard> {
         return;
       }
 
-      // 🔐 OTHER AUTH ERRORS
+      //  OTHER AUTH ERRORS
       setState(() {
         _error = message.replaceAll('Exception: ', '');
       });
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
+  }
+
+  Future<void> _goToSignup() async {
+    // If a previous session exists (for example banker), clear it so
+    // router guards do not bounce signup back to a dashboard.
+    await ref.read(authNotifierProvider.notifier).logout();
+    if (!mounted) return;
+    context.go('/signup');
   }
 
   @override
@@ -252,6 +260,14 @@ class _LoginCardState extends ConsumerState<_LoginCard> {
                 ),
               ),
               const SizedBox(height: DT.gapSm),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => context.push('/forgot-password'),
+                  child: const Text('Forgot password?'),
+                ),
+              ),
+              const SizedBox(height: DT.gapSm),
               RichText(
                 text: TextSpan(
                   text: 'New here? ',
@@ -263,8 +279,7 @@ class _LoginCardState extends ConsumerState<_LoginCard> {
                         color: DT.accent,
                         fontWeight: FontWeight.w600,
                       ),
-                      recognizer: TapGestureRecognizer()
-                        ..onTap = () => context.push('/signup'),
+                      recognizer: TapGestureRecognizer()..onTap = _goToSignup,
                     ),
                   ],
                 ),

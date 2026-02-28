@@ -1,8 +1,9 @@
-// lib/src/features/auth/signup_screen.dart
-
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../core/app_config.dart';
 import '../../core/auth_notifier.dart';
 import '../../core/design_tokens.dart';
 
@@ -32,26 +33,40 @@ class SignupScreen extends ConsumerStatefulWidget {
 
 class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
+  final Dio _authApi = Dio(
+    BaseOptions(
+      baseUrl: apiBaseUrl,
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+    ),
+  );
 
   SignupRole _role = SignupRole.customer;
   int _step = 0;
   bool _loading = false;
+  bool _loadingBanks = false;
   String? _error;
+  List<_BankOption> _banks = [];
+  String? _selectedBankId;
 
-  // Common
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _phone = TextEditingController();
 
-  // Merchant
   final _bizName = TextEditingController();
   final _bizGstin = TextEditingController();
   final _bizAddress = TextEditingController();
 
-  // Banker
   final _employeeId = TextEditingController();
   final _bankBranch = TextEditingController();
+  final _bankPincode = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBanks();
+  }
 
   @override
   void dispose() {
@@ -64,7 +79,43 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     _bizAddress.dispose();
     _employeeId.dispose();
     _bankBranch.dispose();
+    _bankPincode.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadBanks() async {
+    setState(() => _loadingBanks = true);
+    try {
+      final res = await _authApi.get('/banks');
+      final raw = res.data;
+      List list;
+      if (raw is List) {
+        list = raw;
+      } else if (raw is Map && raw['data'] is List) {
+        list = raw['data'] as List;
+      } else {
+        list = const [];
+      }
+
+      final parsed = list
+          .whereType<Map>()
+          .map((e) => _BankOption.fromMap(e.cast<String, dynamic>()))
+          .where((e) => e.id.isNotEmpty)
+          .toList();
+
+      setState(() {
+        _banks = parsed;
+        if (_banks.isNotEmpty && _selectedBankId == null) {
+          _selectedBankId = _banks.first.id;
+        }
+      });
+    } catch (_) {
+      setState(() {
+        _banks = [];
+      });
+    } finally {
+      if (mounted) setState(() => _loadingBanks = false);
+    }
   }
 
   Map<String, dynamic> _buildPayload() {
@@ -73,11 +124,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       'email': _email.text.trim(),
       'password': _password.text,
       'role': _role.roleString,
+      if (_phone.text.trim().isNotEmpty) 'phone': _phone.text.trim(),
     };
-
-    if (_phone.text.trim().isNotEmpty) {
-      payload['phone'] = _phone.text.trim();
-    }
 
     if (_role == SignupRole.merchant) {
       payload.addAll({
@@ -91,9 +139,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
     if (_role == SignupRole.banker) {
       payload.addAll({
-        // TEMP – must be replaced with real bank selection later
-        'bankId': 'TEMP_BANK_ID',
+        'bankId': _selectedBankId,
         'branch': _bankBranch.text.trim(),
+        'pincode': _bankPincode.text.trim(),
         'employeeId': _employeeId.text.trim(),
       });
     }
@@ -111,22 +159,18 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
     try {
       await ref.read(authNotifierProvider.notifier).signup(_buildPayload());
-
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Account created. Please verify your email before logging in.',
-          ),
+              'Account created. Please verify your email before logging in.'),
         ),
       );
-
-      // 🔁 Go back to login
-      Navigator.of(context).pop();
+      context.go('/login');
     } catch (e) {
       setState(() {
-        _error = 'Signup failed. Please check details and try again.';
+        _error = e.toString().replaceFirst('Exception: ', '');
       });
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -165,54 +209,92 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                                       .textTheme
                                       .headlineSmall),
                               const SizedBox(height: DT.gap),
-
-                              /// ROLE SELECTOR
                               Wrap(
                                 spacing: DT.gapSm,
-                                children: SignupRole.values.map((r) {
+                                children: SignupRole.values.map((role) {
                                   return ChoiceChip(
-                                    label: Text(r.label),
-                                    selected: _role == r,
+                                    label: Text(role.label),
+                                    selected: _role == role,
                                     onSelected: (_) {
                                       setState(() {
-                                        _role = r;
+                                        _role = role;
                                         _step = 0;
                                       });
                                     },
                                   );
                                 }).toList(),
                               ),
-
                               const SizedBox(height: DT.gap),
-
-                              /// STEP 1 – BASIC
                               if (!isMulti || _step == 0) ...[
                                 _field(_name, 'Full name'),
                                 _emailField(),
                                 _passwordField(),
-                                _field(_phone, 'Phone (optional)',
-                                    required: false),
+                                _field(_phone, 'Phone', required: true),
                               ],
-
-                              /// STEP 2 – ROLE SPECIFIC
                               if (isMulti && _step == 1) ...[
-                                if (_role == SignupRole.merchant)
+                                if (_role == SignupRole.merchant) ...[
                                   _field(_bizName, 'Business name'),
+                                  _field(_bizGstin, 'GST Number',
+                                      required: false),
+                                  _field(_bizAddress, 'Address',
+                                      required: false),
+                                ],
                                 if (_role == SignupRole.banker) ...[
-                                  _field(_employeeId, 'Employee ID'),
+                                  if (_loadingBanks)
+                                    const Padding(
+                                      padding:
+                                          EdgeInsets.only(bottom: DT.gapSm),
+                                      child: LinearProgressIndicator(),
+                                    ),
+                                  Padding(
+                                    padding:
+                                        const EdgeInsets.only(bottom: DT.gapSm),
+                                    child: DropdownButtonFormField<String>(
+                                      initialValue: _selectedBankId,
+                                      decoration: const InputDecoration(
+                                          labelText: 'Bank'),
+                                      items: _banks
+                                          .map(
+                                            (bank) => DropdownMenuItem<String>(
+                                              value: bank.id,
+                                              child: Text(bank.name),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (v) =>
+                                          setState(() => _selectedBankId = v),
+                                      validator: (v) {
+                                        if (_role != SignupRole.banker) {
+                                          return null;
+                                        }
+                                        if (v == null || v.isEmpty) {
+                                          return 'Bank is required';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                  _field(_employeeId, 'Employee ID',
+                                      required: false),
                                   _field(_bankBranch, 'Branch'),
+                                  _field(_bankPincode, 'Pincode'),
+                                  if (!_loadingBanks && _banks.isEmpty)
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: TextButton.icon(
+                                        onPressed: _loadBanks,
+                                        icon: const Icon(Icons.refresh),
+                                        label: const Text('Retry bank list'),
+                                      ),
+                                    ),
                                 ],
                               ],
-
                               if (_error != null) ...[
                                 const SizedBox(height: DT.gapSm),
                                 Text(_error!,
                                     style: const TextStyle(color: Colors.red)),
                               ],
-
                               const SizedBox(height: DT.gap),
-
-                              /// ACTIONS
                               Row(
                                 children: [
                                   if (isMulti && _step > 0)
@@ -275,7 +357,20 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     );
   }
 
-  Widget _emailField() => _field(_email, 'Email');
+  Widget _emailField() => Padding(
+        padding: const EdgeInsets.only(bottom: DT.gapSm),
+        child: TextFormField(
+          controller: _email,
+          decoration: const InputDecoration(labelText: 'Email'),
+          keyboardType: TextInputType.emailAddress,
+          validator: (v) {
+            if (v == null || v.trim().isEmpty) return 'Required';
+            return RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim())
+                ? null
+                : 'Enter valid email';
+          },
+        ),
+      );
 
   Widget _passwordField() => Padding(
         padding: const EdgeInsets.only(bottom: DT.gapSm),
@@ -287,4 +382,18 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               (v == null || v.length < 8) ? 'Min 8 characters' : null,
         ),
       );
+}
+
+class _BankOption {
+  final String id;
+  final String name;
+
+  const _BankOption({required this.id, required this.name});
+
+  factory _BankOption.fromMap(Map<String, dynamic> map) {
+    return _BankOption(
+      id: map['id']?.toString() ?? '',
+      name: map['name']?.toString() ?? 'Unknown',
+    );
+  }
 }

@@ -5,7 +5,6 @@ class LoanList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // In a real app this would be a FutureProvider that calls the API.
     final demoLoans = [
       {'id': 'L1', 'amount': 50000, 'status': 'PENDING'},
       {'id': 'L2', 'amount': 200000, 'status': 'APPROVED'},
@@ -19,8 +18,8 @@ class LoanList extends StatelessWidget {
           margin: const EdgeInsets.symmetric(vertical: 8),
           child: ListTile(
             title: Text('Loan ${item['id']}'),
-            subtitle: Text('₹${item['amount']} • ${item['status']}'),
-            trailing: Icon(Icons.chevron_right),
+            subtitle: Text('Rs ${item['amount']} | ${item['status']}'),
+            trailing: const Icon(Icons.chevron_right),
             onTap: () {},
           ),
         );
